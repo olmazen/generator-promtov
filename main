@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Portrait Studio: Генератор промтов для портретов</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        :root {
+            --bg-color: #121212;
+            --surface-color: #1e1e1e;
+            --primary-color: #0d6efd;
+            --primary-hover-color: #0b5ed7;
+            --secondary-color: #8a2be2;
+            --text-color: #e0e0e0;
+            --text-muted-color: #8c8c8c;
+            --border-color: #333;
+            --accent-color: #4a90e2;
+            --active-tag-bg: var(--primary-color);
+            --active-tag-text: #ffffff;
+            --tag-bg: #333;
+            --tag-hover-bg: #444;
+            --tag-text: #e0e0e0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            padding: 2rem;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .made-by-link {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: var(--text-muted-color);
+            font-size: 0.8rem;
+            transition: color 0.3s;
+            z-index: 1001; /* Ensure it's above other elements */
+        }
+
+        .made-by-link:hover {
+            color: var(--text-color);
+        }
+
+        .made-by-link svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding-top: 2rem; /* Add padding to avoid overlap with the new link */
+        }
+
+        .workshop {
+            flex: 2;
+            min-width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .canvas {
+            flex: 1;
+            min-width: 300px;
+            position: sticky;
+            top: 2rem;
+            height: calc(100vh - 4rem);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .canvas-content {
+            background-color: var(--surface-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        h1, h2 {
+            color: var(--text-color);
+            margin-bottom: 1rem;
+            font-weight: 700;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 2rem;
+            width: 100%;
+            font-size: 2.5rem;
+            background: linear-gradient(45deg, var(--secondary-color), var(--primary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        h2 {
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+        
+        h3 {
+            color: var(--text-muted-color);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .main-prompt-wrapper {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .main-prompt-input {
+            flex-grow: 1;
+            padding: 0.75rem;
+            background-color: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-color);
+            font-size: 1rem;
+            transition: border-color 0.3s, box-shadow 0.3s;
+            min-width: 200px;
+        }
+
+        .main-prompt-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
+        }
+        
+        .ai-button {
+            background: linear-gradient(45deg, var(--secondary-color), var(--primary-color));
+            border: none;
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            color: white;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            gap: 0.5rem;
+        }
+        
+        .ai-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(138, 43, 226, 0.4);
+        }
+        
+        .ai-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        details {
+            background-color: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+            transition: box-shadow 0.3s;
+        }
+        
+        details[open] {
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+
+        summary {
+            padding: 1rem;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1.1rem;
+            list-style: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.2s;
+        }
+        
+        summary:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        summary::after {
+            content: '+';
+            font-size: 1.5rem;
+            transition: transform 0.3s ease;
+            color: var(--text-muted-color);
+        }
+
+        details[open] summary::after {
+            transform: rotate(45deg);
+        }
+
+        .accordion-content {
+            padding: 0 1rem 1rem 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .tag-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .tag {
+            background-color: var(--tag-bg);
+            color: var(--tag-text);
+            padding: 0.4rem 0.8rem;
+            border-radius: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+            border: 1px solid transparent;
+            user-select: none;
+        }
+
+        .tag:hover {
+            background-color: var(--tag-hover-bg);
+            transform: translateY(-1px);
+        }
+
+        .tag.active {
+            background-color: var(--active-tag-bg);
+            color: var(--active-tag-text);
+            font-weight: 500;
+        }
+        
+        #final-prompt-display {
+            width: 100%;
+            flex-grow: 1;
+            background-color: #111;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-color);
+            font-size: 1rem;
+            padding: 0.75rem;
+            resize: none;
+            margin-bottom: 1rem;
+            min-height: 200px;
+        }
+        
+        .canvas-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .copy-button {
+            flex-grow: 1;
+            padding: 0.75rem;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .copy-button:hover {
+            background-color: var(--primary-hover-color);
+        }
+        
+        .copy-button.copied {
+            background-color: #28a745;
+        }
+
+        .vpn-note {
+            font-size: 0.75rem;
+            color: var(--text-muted-color);
+            text-align: center;
+            width: 100%;
+            margin-top: 0.5rem;
+        }
+
+        .style-guide-link {
+            display: block;
+            margin-top: 1rem;
+            font-size: 0.8rem;
+            color: var(--text-muted-color);
+            text-align: center;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .style-guide-link:hover {
+            color: var(--accent-color);
+            text-decoration: underline;
+        }
+        
+        .loader {
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background-color: var(--surface-color);
+            padding: 2rem;
+            border-radius: 8px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+        
+        .modal-overlay.visible .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-content h2 {
+            margin-top: 0;
+        }
+
+        .idea-card {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+        
+        .idea-card:hover {
+            background-color: #2a2a2a;
+            border-color: var(--primary-color);
+        }
+        
+        .modal-close-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            display: block;
+            margin-top: 1rem;
+            margin-left: auto;
+        }
+
+        @media (max-width: 1024px) {
+            body {
+                padding: 1rem;
+                padding-top: 3rem; /* Adjust padding for mobile to not overlap link */
+            }
+            .container {
+                flex-direction: column;
+                padding-top: 0;
+            }
+            .canvas {
+                position: relative;
+                top: 0;
+                height: auto;
+                min-height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="https://t.me/almazofnik" target="_blank" class="made-by-link">
+        <svg viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="m98.883 144.13-4.09 39.866c4.763 0 6.63-2.22 9.23-4.793l19.038-18.32 39.11 28.928c7.002 4.09 12.02 1.95 13.84-6.22l23.56-110.38c2.14-9.843-3.08-13.66-10.3-10.9l-132.84 51.56c-9.65 3.72-9.52 9.1-1.66 11.53l33.56 10.43 78.52-49.38c3.72-2.33 7.18-.98 4.25 1.5l-63.1 56.99Z" fill="currentColor"></path></svg>
+        <span>made by almaz.ai</span>
+    </a>
+
+    <div class="container">
+        <h1>AI Portrait Studio</h1>
+        <div class="workshop" id="workshop">
+            <div class="input-group">
+                <h2>Шаг 1: Опишите персонажа</h2>
+                <div class="main-prompt-wrapper">
+                    <input type="text" id="main-prompt" class="main-prompt-input" placeholder="Например: a wise old wizard with a long white beard">
+                    <button id="generate-idea-btn" class="ai-button">✨ Идея</button>
+                </div>
+            </div>
+            <div id="accordions-container">
+                <!-- Аккордеоны будут сгенерированы JS -->
+            </div>
+        </div>
+        <div class="canvas">
+            <div class="canvas-content">
+                <h2>Ваш промт:</h2>
+                <textarea id="final-prompt-display" readonly></textarea>
+                <div class="canvas-buttons">
+                    <button id="copy-button" class="copy-button">Копировать</button>
+                    <button id="enhance-prompt-btn" class="ai-button">✨ Улучшить</button>
+                </div>
+                <p class="vpn-note">Работает с VPN</p>
+            </div>
+        </div>
+    </div>
+    
+    <div id="idea-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 id="idea-modal-title">✨ AI предлагает идеи для портретов:</h2>
+            <div id="idea-modal-body"></div>
+            <button id="idea-modal-close" class="modal-close-btn">Закрыть</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const promptOptions = [
+                {
+                    title: '👤 Внешность',
+                    id: 'appearance',
+                    groups: [
+                        { name: 'Пол', singleChoice: true, options: [{ label: 'Женщина', value: 'woman' }, { label: 'Мужчина', value: 'man' }] },
+                        { name: 'Возраст', singleChoice: true, options: [{ label: 'Ребенок', value: 'child' }, { label: 'Подросток', value: 'teenager' }, { label: 'Молодой', value: 'young' }, { label: 'Взрослый', value: 'adult' }, { label: 'Пожилой', value: 'elderly' }] },
+                        { name: 'Этнос', singleChoice: true, options: [{ label: 'Европеоид', value: 'caucasian' }, { label: 'Азиат', value: 'asian' }, { label: 'Африканец', value: 'african' }, { label: 'Латиноамериканец', value: 'hispanic' }, { label: 'Восточный', value: 'eastern' }] },
+                        { name: 'Телосложение', singleChoice: true, options: [{ label: 'V-образное', value: 'v-shape body type' }, { label: 'Овальное', value: 'oval body type' }, { label: 'Прямоугольное', value: 'rectangular body type' }, { label: 'Вытянутое', value: 'elongated body type' }] }
+                    ]
+                },
+                {
+                    title: '🧑‍🦰 Лицо и волосы',
+                    id: 'face_hair',
+                    groups: [
+                        { name: 'Черты лица', options: [{ label: 'Высокие скулы', value: 'high cheekbones' }, { label: 'Веснушки', value: 'freckles' }, { label: 'Ямочки на щеках', value: 'dimples' }, { label: 'Квадратная челюсть', value: 'square jaw' }, { label: 'Морщины', value: 'wrinkles' }, { label: 'Вытянутое лицо', value: 'long face' }, { label: 'Овальное лицо', value: 'oval face' }, { label: 'Прямоугольное лицо', value: 'rectangular face' }] },
+                        { name: 'Глаза', singleChoice: true, options: [{ label: 'Голубые', value: 'blue eyes' }, { label: 'Карие', value: 'brown eyes' }, { label: 'Зеленые', value: 'green eyes' }] },
+                        { name: 'Стрижка', options: [{ label: 'Лысая', value: 'bald' }, { label: 'Бритая', value: 'shaved head' }, { label: 'Короткая', value: 'short hair' }, { label: 'Средней длины', value: 'medium length hair' }, { label: 'Карэ', value: 'bob cut' }, { label: 'До плеч', value: 'shoulder-length hair' }, { label: 'Длинные', value: 'long hair' }] },
+                        { name: 'Цвет волос', options: [{ label: 'Белые', value: 'white hair' }, { label: 'Русые', value: 'blond hair' }, { label: 'Рыжие', value: 'red hair' }, { label: 'Каштановые', value: 'brown hair' }, { label: 'Темные', value: 'dark hair' }, { label: 'Черные', value: 'black hair' }] },
+                        { name: 'Форма волос', options: [{ label: 'Прямые', value: 'straight hair' }, { label: 'Волнистые', value: 'wavy hair' }, { label: 'Кудрявые', value: 'curly hair' }, { label: 'Кучерявые', 'value': 'coily hair' }, { label: 'Мелко-кудрявые', value: 'afro-textured hair' }, { label: 'Непослушные', value: 'messy hair' }] }
+                    ]
+                },
+                {
+                    title: '👕 Гардероб',
+                    id: 'clothing',
+                    groups: [
+                        { name: 'Общий стиль', singleChoice: true, options: [{ label: 'Casual', value: 'casual style' }, { label: 'Винтаж', value: 'vintage style' }, { label: 'Готика', value: 'gothic style' }, { label: 'Киберпанк', value: 'cyberpunk style' }, { label: 'Деловой', value: 'business style' }, { label: 'Спортивный', value: 'sporty style' }] },
+                        { name: 'Верхняя одежда', options: [{ label: 'Плащ', value: 'trench coat' }, { label: 'Куртка', value: 'jacket' }, { label: 'Пальто', value: 'coat' }, { label: 'Бомбер', value: 'bomber jacket' }, { label: 'Пуховик', value: 'puffer jacket' }] },
+                        { name: 'Основная одежда (верх)', options: [{ label: 'Рубашка', value: 'shirt' }, { label: 'Футболка', value: 't-shirt' }, { label: 'Свитер', value: 'sweater' }, { label: 'Худи', value: 'hoodie' }, { label: 'Топ', value: 'top' }, { label: 'Блузка', value: 'blouse' }] },
+                        { name: 'Основная одежда (низ)', options: [{ label: 'Джинсы', value: 'jeans' }, { label: 'Брюки', value: 'trousers' }, { label: 'Юбка', value: 'skirt' }, { label: 'Шорты', value: 'shorts' }, { label: 'Леггинсы', value: 'leggings' }] },
+                        { name: 'Обувь', singleChoice: true, options: [{ label: 'Ботинки', value: 'boots' }, { label: 'Кроссовки', value: 'sneakers' }, { label: 'Туфли', value: 'shoes' }, { label: 'Сандалии', value: 'sandals' }, { label: 'Лоферы', value: 'loafers' }] },
+                        { name: 'Аксессуары', options: [{ label: 'Очки', value: 'glasses' }, { label: 'Шляпа', value: 'hat' }, { label: 'Часы', value: 'watch' }, { label: 'Ожерелье', value: 'necklace' }, { label: 'Шарф', value: 'scarf' }, { label: 'Перчатки', value: 'gloves' }, { label: 'Сумка', value: 'bag' }] }
+                    ]
+                },
+                {
+                    title: '🧘 Эмоции и поза',
+                    id: 'emotion_pose',
+                    groups: [
+                        { name: 'Настроение', options: [{ label: 'Радостный', value: 'joyful' }, { label: 'Задумчивый', value: 'pensive' }, { label: 'Меланхоличный', value: 'melancholic' }, { label: 'Уверенный', value: 'confident' }, { label: 'Безмятежный', value: 'serene' }, { label: 'Таинственный', value: 'mysterious' }] },
+                        { name: 'Поза', options: [{ label: 'Смотрит в камеру', value: 'looking at the camera' }, { label: 'Взгляд через плечо', value: 'looking over the shoulder' }, { label: 'В профиль', value: 'side profile' }, { label: 'Руки в карманах', value: 'hands in pockets' }, { label: 'Динамичная поза', value: 'dynamic pose' }] }
+                    ]
+                },
+                {
+                    title: '📸 Композиция и ракурс',
+                    id: 'composition',
+                    groups: [
+                        { name: 'Тип плана', options: [{ label: 'Крупный план (лицо)', value: 'close-up portrait' }, { label: 'Средний план (по пояс)', value: 'medium shot' }, { label: 'В полный рост', value: 'full body shot' }, { label: 'Сверхкрупный (деталь)', value: 'extreme close-up' }] },
+                        { name: 'Ракурс', options: [{ label: 'На уровне глаз', value: 'eye-level shot' }, { label: 'Снизу вверх', value: 'low-angle shot' }, { label: 'Сверху вниз', value: 'high-angle shot' }, { label: 'Голландский угол', value: 'dutch angle' }] }
+                    ]
+                },
+                {
+                    title: '💡 Освещение',
+                    id: 'lighting',
+                    groups: [
+                        { name: 'Схема света', options: [{ label: 'Контурный свет', value: 'rim lighting' }, { label: 'Рисующий свет', value: 'key light' }, { label: 'Заполняющий свет', value: 'fill light' }, { label: 'Естественный свет', value: 'natural light' }] },
+                        { name: 'Время суток', options: [{ label: 'Утро', value: 'morning' }, { label: 'День', value: 'daytime' }, { label: 'Вечер', value: 'evening' }, { label: 'Золотой час (закат)', value: 'golden hour' }, { label: 'Ночь', value: 'night' }, { label: 'Лунный свет', value: 'moonlight' }] }
+                    ]
+                },
+                {
+                    title: '📷 Камера и пленка',
+                    id: 'camera_film',
+                    groups: [
+                        { name: 'Объектив', singleChoice: true, options: [{ label: 'Фишай', value: 'fisheye lens' }, { label: 'Ультраширокий', value: 'ultra-wide lens' }, { label: '35mm', value: '35mm lens' }, { label: '50mm', value: '50mm lens' }, { label: '85mm (портретный)', value: '85mm lens' }, { label: 'Макро', value: 'macro lens' }] },
+                        { name: 'Пленка', options: [{ label: 'Kodak Portra 400', value: 'shot on Kodak Portra 400' }, { label: 'CineStill 800T', value: 'shot on CineStill 800T' }, { label: 'Fujifilm Pro 400H', value: 'shot on Fujifilm Pro 400H' }, { label: 'Ilford HP5 (Ч/Б)', value: 'shot on Ilford HP5' }, { label: 'Зерно пленки', value: 'film grain' }] }
+                    ]
+                },
+                {
+                    title: '🎨 Стиль и техника',
+                    id: 'style_medium',
+                    groups: [
+                        { 
+                            name: 'Стиль', 
+                            options: [
+                                { label: 'Pixar 3D', value: 'in the style of Pixar 3D animation' },
+                                { label: 'Ghibli', value: 'in the style of Studio Ghibli' },
+                                { label: 'Rick and Morty', value: 'in the style of Rick and Morty' },
+                                { label: 'Disney Classic', value: 'in the style of classic Disney animation' },
+                                { label: 'Picasso', value: 'in the style of Picasso' },
+                                { label: 'Lego Style', value: 'Lego brick style' },
+                                { label: 'Fleischer Studios', value: 'in the style of Fleischer Studios animation' },
+                                { label: 'Muppet Realistic', value: 'realistic Muppet style' },
+                                { label: 'Doodle Art', value: 'doodle art style' },
+                                { label: 'Brutalist 3D', value: 'Brutalist 3D render' }
+                            ] 
+                        }
+                    ]
+                },
+                {
+                    title: '🏞️ Фон',
+                    id: 'background',
+                    groups: [
+                        { name: 'Тип', options: [{ label: 'Студийный фон', value: 'studio background' }, { label: 'Минималистичный фон', value: 'minimalist background' }, { label: 'Городской пейзаж', value: 'urban cityscape background' }, { label: 'Природный ландшафт', value: 'nature background' }, { label: 'Размытый фон', value: 'blurred background' }] }
+                    ]
+                }
+            ];
+
+            const accordionsContainer = document.getElementById('accordions-container');
+            promptOptions.forEach(category => {
+                const details = document.createElement('details');
+                const summary = document.createElement('summary');
+                summary.textContent = category.title;
+                details.appendChild(summary);
+
+                const content = document.createElement('div');
+                content.className = 'accordion-content';
+
+                category.groups.forEach(group => {
+                    const groupTitle = document.createElement('h3');
+                    groupTitle.textContent = group.name;
+                    content.appendChild(groupTitle);
+
+                    const tagContainer = document.createElement('div');
+                    tagContainer.className = 'tag-container';
+                    if (group.singleChoice) {
+                        tagContainer.dataset.singleChoice = 'true';
+                    }
+                    group.options.forEach(option => {
+                        const tag = document.createElement('span');
+                        tag.className = 'tag';
+                        tag.textContent = option.label;
+                        tag.dataset.value = option.value;
+                        tag.dataset.category = category.id;
+                        tagContainer.appendChild(tag);
+                    });
+                    content.appendChild(tagContainer);
+                });
+
+                details.appendChild(content);
+                accordionsContainer.appendChild(details);
+
+                if (category.id === 'style_medium') {
+                    const guideLink = document.createElement('a');
+                    guideLink.href = 'https://t.me/almazofnik/701';
+                    guideLink.target = '_blank';
+                    guideLink.rel = 'noopener noreferrer';
+                    guideLink.className = 'style-guide-link';
+                    guideLink.textContent = 'полный гайд на стиле в канале';
+                    content.appendChild(guideLink);
+                }
+            });
+
+            let promptState = { subject: '' };
+            promptOptions.forEach(cat => {
+                promptState[cat.id] = [];
+            });
+
+            const mainPromptInput = document.getElementById('main-prompt');
+            const finalPromptDisplay = document.getElementById('final-prompt-display');
+            const workshop = document.getElementById('workshop');
+            const copyButton = document.getElementById('copy-button');
+            const enhancePromptBtn = document.getElementById('enhance-prompt-btn');
+            const generateIdeaBtn = document.getElementById('generate-idea-btn');
+            const ideaModal = document.getElementById('idea-modal');
+            const ideaModalBody = document.getElementById('idea-modal-body');
+            const ideaModalClose = document.getElementById('idea-modal-close');
+
+            const updatePrompt = () => {
+                let promptParts = [];
+                if (promptState.subject) {
+                    promptParts.push(promptState.subject);
+                }
+
+                const categoryOrder = ['appearance', 'face_hair', 'clothing', 'emotion_pose', 'composition', 'lighting', 'camera_film', 'style_medium', 'background'];
+                
+                const userHasSelectedStyle = promptState['style_medium'] && promptState['style_medium'].length > 0;
+
+                categoryOrder.forEach(catId => {
+                    if (promptState[catId] && promptState[catId].length > 0) {
+                        promptParts.push(...promptState[catId]);
+                    }
+                });
+                
+                if (!userHasSelectedStyle) {
+                    promptParts.push('hyperrealistic, photorealistic');
+                }
+
+                finalPromptDisplay.value = promptParts.filter(p => p).join(', ');
+            };
+
+            async function callGemini(requestPrompt) {
+                const apiKey = ""; 
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                const payload = { contents: [{ role: "user", parts: [{ text: requestPrompt }] }] };
+
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) throw new Error(`API call failed: ${response.status}`);
+                    const result = await response.json();
+                    return result.candidates?.[0]?.content?.parts?.[0]?.text || "Не удалось получить ответ от AI.";
+                } catch (error) {
+                    console.error("Error calling Gemini API:", error);
+                    return "Ошибка при обращении к AI.";
+                }
+            }
+
+            function setLoadingState(button, isLoading) {
+                button.disabled = isLoading;
+                if (isLoading) {
+                    button.innerHTML = '<div class="loader"></div>';
+                } else {
+                    button.innerHTML = button.id.includes('enhance') ? '✨ Улучшить' : '✨ Идея';
+                }
+            }
+            
+            workshop.addEventListener('click', (e) => {
+                if (e.target.classList.contains('tag')) {
+                    const tag = e.target;
+                    const value = tag.dataset.value;
+                    const category = tag.dataset.category;
+                    const groupContainer = tag.parentElement;
+                    const isSingleChoice = groupContainer.dataset.singleChoice === 'true';
+                    const wasActive = tag.classList.contains('active');
+
+                    if (isSingleChoice) {
+                        const valuesInGroup = Array.from(groupContainer.children).map(t => t.dataset.value);
+                        promptState[category] = promptState[category].filter(v => !valuesInGroup.includes(v));
+                        
+                        groupContainer.querySelectorAll('.tag').forEach(t => t.classList.remove('active'));
+                        
+                        if (!wasActive) {
+                            tag.classList.add('active');
+                            promptState[category].push(value);
+                        }
+                    } else {
+                        tag.classList.toggle('active');
+                        const valueIndex = promptState[category].indexOf(value);
+                        if (valueIndex > -1) {
+                            promptState[category].splice(valueIndex, 1);
+                        } else {
+                            promptState[category].push(value);
+                        }
+                    }
+                    updatePrompt();
+                }
+            });
+
+            enhancePromptBtn.addEventListener('click', async () => {
+                const currentPrompt = finalPromptDisplay.value;
+                if (!currentPrompt.trim()) { alert("Сначала опишите персонажа или соберите промт."); return; }
+                
+                setLoadingState(enhancePromptBtn, true);
+                const geminiRequest = `Take this portrait generation prompt and make it more vivid, detailed, and cinematic. Keep the core subject but expand on it with more evocative language about their expression, the lighting, and the atmosphere. Do not add technical parameters like --ar. The original prompt is: "${currentPrompt}"`;
+                const enhancedPrompt = await callGemini(geminiRequest);
+                
+                const cleanPrompt = enhancedPrompt.replace(/[\*#`]/g, '').trim();
+                finalPromptDisplay.value = cleanPrompt;
+                promptState.subject = cleanPrompt.split(',')[0];
+                mainPromptInput.value = promptState.subject;
+                
+                setLoadingState(enhancePromptBtn, false);
+            });
+
+            generateIdeaBtn.addEventListener('click', async () => {
+                const theme = mainPromptInput.value.trim() || 'a person';
+                
+                setLoadingState(generateIdeaBtn, true);
+                const geminiRequest = `Generate 3 distinct and creative ideas for an AI portrait based on the theme: "${theme}". Present each idea as a simple, ready-to-use prompt string. Use "IDEA:" as a separator before each prompt.`;
+                const ideasResponse = await callGemini(geminiRequest);
+                
+                ideaModalBody.innerHTML = '';
+                const ideas = ideasResponse.split('IDEA:').filter(idea => idea.trim() !== '');
+
+                if (ideas.length > 0) {
+                    ideas.forEach(ideaText => {
+                        const cleanIdea = ideaText.replace(/[\*#`]/g, '').trim();
+                        const ideaCard = document.createElement('div');
+                        ideaCard.className = 'idea-card';
+                        ideaCard.textContent = cleanIdea;
+                        ideaCard.onclick = () => {
+                            mainPromptInput.value = cleanIdea;
+                            promptState.subject = cleanIdea;
+                            updatePrompt();
+                            ideaModal.classList.remove('visible');
+                        };
+                        ideaModalBody.appendChild(ideaCard);
+                    });
+                } else {
+                     ideaModalBody.textContent = 'Не удалось сгенерировать идеи. Попробуйте еще раз.';
+                }
+
+                ideaModal.classList.add('visible');
+                setLoadingState(generateIdeaBtn, false);
+            });
+
+            ideaModalClose.addEventListener('click', () => ideaModal.classList.remove('visible'));
+            ideaModal.addEventListener('click', (e) => { if (e.target === ideaModal) ideaModal.classList.remove('visible'); });
+
+            mainPromptInput.addEventListener('input', (e) => {
+                promptState.subject = e.target.value.trim();
+                updatePrompt();
+            });
+
+            copyButton.addEventListener('click', () => {
+                finalPromptDisplay.select();
+                try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                        copyButton.textContent = 'Скопировано!';
+                        copyButton.classList.add('copied');
+                        setTimeout(() => {
+                            copyButton.textContent = 'Копировать';
+                            copyButton.classList.remove('copied');
+                        }, 1500);
+                    } else {
+                        console.error('Failed to copy text.');
+                        alert('Не удалось скопировать текст.');
+                    }
+                } catch (err) {
+                    console.error('Oops, unable to copy', err);
+                    alert('Ошибка при копировании текста.');
+                }
+                window.getSelection().removeAllRanges();
+            });
+
+            updatePrompt();
+        });
+    </script>
+</body>
+</html>
